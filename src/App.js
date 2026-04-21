@@ -10,7 +10,7 @@ function App() {
   // 1. Sabhi batteries fetch karne ke liye (Ngrok Link Updated)
   const fetchBatteries = async () => {
     try {
-      const res = await fetch('https://equal-giveaway-chatroom.ngrok-free.dev/api/batteries/all');
+      const res = await fetch('https://smart-energy-app-bbac.onrender.com/api/batteries/all');
       const data = await res.json();
       setBatteries(data);
     } catch (err) {
@@ -71,7 +71,7 @@ function App() {
   // 3. Nayi battery add karne ke liye (Ngrok Link Updated)
   const addBattery = async () => {
     if (!newSerial) return;
-    await fetch('https://equal-giveaway-chatroom.ngrok-free.dev/api/batteries/add', {
+    await fetch('https://smart-energy-app-bbac.onrender.com/api/batteries/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ serialNumber: newSerial })
