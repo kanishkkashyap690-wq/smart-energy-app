@@ -1,63 +1,120 @@
-import React, { useState, useEffect } from 'react';
-import { Html5QrcodeScanner } from "html5-qrcode";
-import axios from 'axios';
+import React, { useEffect, useState } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+import Dashboard from './Dashboard';
+import { Scan, LayoutDashboard } from 'lucide-react';
+import './App.css';
 
-const Scanner = () => {
-    const [scanResult, setScanResult] = useState(null);
+function App() {
+  const [scanResult, setScanResult] = useState(null);
+  const [view, setView] = useState('scanner');
+  const [allScans, setAllScans] = useState([]);
+  const [vendorName, setVendorName] = useState(''); // Vendor name state add kiya
 
-    useEffect(() => {
-        // Render ka live URL - Aapka live backend link
-        const API_URL = "https://smart-energy-app-bbac.onrender.com/api/batteries";
+  // Database se purana data fetch karne ke liye
+  useEffect(() => {
+    fetch('https://smart-energy-app-bbac.onrender.com/api/scans')
+      .then(res => res.json())
+      .then(data => {
+        const formattedData = data.map(item => ({
+          qrData: item.qrData,
+          vendor: item.vendor || 'Unknown', // Vendor field handle kiya
+          time: new Date(item.createdAt).toLocaleTimeString()
+        }));
+        setAllScans(formattedData);
+      })
+      .catch(err => console.error("Fetch Error:", err));
+  }, []);
 
-        const scanner = new Html5QrcodeScanner('reader', {
-            qrbox: { width: 250, height: 250 },
-            fps: 5,
-            // YE RAHI MAIN SETTING BACK CAMERA KE LIYE
-            videoConstraints: {
-                facingMode: { exact: "environment" }
-            },
-            rememberLastUsedCamera: true,
-            showTorchButtonIfSupported: true
-        });
+  useEffect(() => {
+    if (view === 'scanner') {
+      const scanner = new Html5QrcodeScanner('reader', {
+        qrbox: { width: 250, height: 250 },
+        fps: 10,
+      });
 
-        scanner.render(success, error);
+      scanner.render(success, error);
 
-        async function success(result) {
-            scanner.clear();
-            setScanResult(result);
+      function success(result) {
+        scanner.clear();
+        setScanResult(result);
 
-            // Scan hote hi data database mein save hoga
-            try {
-                const response = await axios.post(API_URL, {
-                    batteryId: result,
-                    status: "Active",
-                    lastScanned: new Date()
-                });
-                console.log("Data saved to MongoDB:", response.data);
-                alert("Battery Scanned & Saved!");
-            } catch (err) {
-                console.error("Error saving to DB:", err);
-                alert("Database mein save nahi hua!");
-            }
-        }
+        const newEntry = {
+          qrData: result,
+          vendor: vendorName || 'Unknown Vendor', // Vendor name entry mein add kiya
+          time: new Date().toLocaleTimeString()
+        };
+        setAllScans(prev => [newEntry, ...prev]);
 
-        function error(err) {
-            // Sirf scanning ke error logs hain, ise ignore kar sakte hain
-        }
+        // Backend API Call with Vendor Name
+        fetch('https://smart-energy-app-bbac.onrender.com/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            qrData: result,
+            vendor: vendorName || 'Unknown Vendor'
+          }),
+        })
+        .then(res => res.json())
+        .catch(err => console.error("Database Error:", err));
+      }
 
-        return () => scanner.clear();
-    }, []);
+      function error(err) { /* Ignore */ }
+      return () => scanner.clear();
+    }
+  }, [view, vendorName]);
 
-    return (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-            <h2>Smart Energy Battery Scanner</h2>
-            {scanResult ? (
-                <div>Success: <a href={scanResult}>{scanResult}</a></div>
-            ) : (
-                <div id="reader"></div>
-            )}
+  return (
+    <div className="App">
+      <h1>Smart Energy App</h1>
+
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
+        <button
+          onClick={() => setView('scanner')}
+          className={view === 'scanner' ? 'nav-btn active' : 'nav-btn'}
+        >
+          <Scan size={18} /> Scanner
+        </button>
+        <button
+          onClick={() => setView('dashboard')}
+          className={view === 'dashboard' ? 'nav-btn active' : 'nav-btn'}
+        >
+          <LayoutDashboard size={18} /> Dashboard
+        </button>
+      </div>
+
+      {view === 'scanner' ? (
+        <div className="container">
+          {scanResult ? (
+            <div className="success-text">
+              <h3>Scan Successful!</h3>
+              <p>Battery: {scanResult}</p>
+              <p>Vendor: {vendorName || 'General'}</p>
+              <button onClick={() => { setScanResult(null); setVendorName(''); }}>Scan Next</button>
+            </div>
+          ) : (
+            <div className="scanner-box">
+              {/* Vendor Name Input Field */}
+              <input
+                type="text"
+                placeholder="Vendor ka naam likho..."
+                value={vendorName}
+                onChange={(e) => setVendorName(e.target.value)}
+                className="vendor-input"
+              />
+              <p style={{ color: '#94a3b8', marginBottom: '15px' }}>Scan Battery QR Code</p>
+              <div id="reader"></div>
+            </div>
+          )}
         </div>
-    );
-};
+      ) : (
+        <Dashboard data={allScans} />
+      )}
 
-export default Scanner;
+      <footer className="footer">
+        Smart Energy Management | Ghaziabad
+      </footer>
+    </div>
+  );
+}
+
+export default App;
